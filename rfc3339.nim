@@ -26,7 +26,7 @@ type
     houroffset, minuteoffset: int8
     components: Bitflags
 
-proc is_leap_year(year: int): bool =
+proc is_leap_year*(year: int): bool =
   ## Checks whether a given year is a leap year.
   let rule1 = (year %% 4) == 0
   let rule2 = (year %% 100) == 0
@@ -44,7 +44,7 @@ when isMainModule:
     check is_leap_year(2001) == false
     check is_leap_year(2020) == true
 
-proc days_in_month(year, month: int): int =
+proc days_in_month*(year, month: int): int =
   ## Returns the number of days in a given month, [1, 12], from the
   ## Gregorian calendar.
   assert month >= 1
@@ -150,5 +150,26 @@ proc `second=`*(self: var DateTime; second: int) =
 proc second*(self: DateTime): int =
   result = self.second.int
 
+proc `second_fraction=`*(self: var DateTime; fraction: int) =
+  assert fraction >= 0
+  assert fraction <= 9
 
+  self.secondfrac = fraction.uint8
+  self.components.incl(DateTimeFragment.SecondFraction)
+
+proc second_fraction*(self: DateTime): int =
+  result = self.secondfrac.int
+
+proc set_offset*(self: var DateTime; hours, minutes: int) =
+  assert hours <= 23
+  assert hours >= -23
+  assert minutes <= 59
+  assert minutes >= -59
+
+  if hours != 0:
+    assert minutes >= 0
+
+  self.houroffset = hours.int8
+  self.minuteoffset = hours.int8
+  self.components.incl(DateTimeFragment.Offset)
 
