@@ -299,6 +299,33 @@ proc to_date*(self: int64): DateTime =
 proc to_epoch_date*(self: int64): DateTime =
   result = (self + 62167219200).to_date
 
+proc to_fulldate_string*(self: DateTime): string =
+  ## Emits a full-date from the date time, in the format YYYY-MM-DD.
+  let y = if DateTimeFragment.Year in self.components: self.year else: 0
+  let m = if DateTimeFragment.Month in self.components: self.month else: 1
+  let d = if DateTimeFragment.Day in self.components: self.day else: 1
+
+  # reserve space for all ten characters, then zero out so we can build
+  # the string in pieces
+  result = newString(10)
+  setLen(result, 0)
+
+  if y <= 9:
+    result &= "000"
+  elif y <= 99:
+    result &= "00"
+  elif y <= 999:
+    result &= "0"
+  result &= $y
+  result &= "-"
+  if m <= 9:
+    result &= "0"
+  result &= $m
+  result &= "-"
+  if d <= 9:
+    result &= "0"
+  result &= $d
+
 when isMainModule:
   test "Date to Epoch":
     var date = DateTime()
@@ -312,6 +339,14 @@ when isMainModule:
     check DateTimeFragment.Hour in date.components == false
 
     check date.to_epoch == 0
+  
+  test "Epoch to Full Date":
+    var date = DateTime()
+    date.year = 1970
+    date.month = 1
+    date.day = 1
+
+    check date.to_fulldate_string() == "1970-01-01"
 
   test "Date to Epoch Round Trip":
     var date = DateTime()
