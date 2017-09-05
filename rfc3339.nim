@@ -326,6 +326,58 @@ proc to_fulldate_string*(self: DateTime): string =
     result &= "0"
   result &= $d
 
+proc to_fulltime_string*(self: DateTime): string =
+  let h = if DateTimeFragment.Hour in self.components: self.hour else: 0
+  let m = if DateTimeFragment.Minute in self.components: self.minute else: 0
+  let s = if DateTimeFragment.Second in self.components: self.second else: 0
+
+  result = newString(16)
+  setLen(result, 0)
+
+  if h <= 9:
+    result &= "0"
+  result &= $h
+  result &= ":"
+  if m <= 9:
+    result &= "0"
+  result &= $m
+  result &= ":"
+  if s <= 9:
+    result &= "0"
+  result &= $s
+
+  if DateTimeFragment.SecondFraction in self.components:
+    result &= "."
+    result &= $self.second_fraction
+
+  if DateTimeFragment.Offset in self.components:
+    result &= "Z"
+
+    if self.mhouroffset == 0:
+      if self.mminuteoffset >= 0:
+        result &= "+"
+      else:
+        result &= "-"
+    else:
+      if self.mhouroffset >= 0:
+        result &= "+"
+
+    if self.mhouroffset <= 9:
+      result &= "0"
+    result &= $abs(self.mhouroffset)
+    result &= ":"
+
+    let m = abs(self.mminuteoffset)
+    if m <= 9:
+      result &= "0"
+    result &= $m
+
+proc `$`*(self: DateTime): string =
+  result = newString(0)
+  result &= self.to_fulldate_string
+  result &= "T"
+  result &= self.to_fulltime_string
+
 when isMainModule:
   test "Date to Epoch":
     var date = DateTime()
@@ -339,7 +391,7 @@ when isMainModule:
     check DateTimeFragment.Hour in date.components == false
 
     check date.to_epoch == 0
-  
+
   test "Epoch to Full Date":
     var date = DateTime()
     date.year = 1970
@@ -347,6 +399,25 @@ when isMainModule:
     date.day = 1
 
     check date.to_fulldate_string() == "1970-01-01"
+    check $date == "1970-01-01T00:00:00"
+
+  test "Positive Time Offsets to String":
+    var date = DateTime()
+    date.year = 1970
+    date.month = 1
+    date.day = 1
+    date.set_offset(1, 0)
+
+    check $date == "1970-01-01T00:00:00Z+01:00"
+
+  test "Negative Time Offsets to String":
+    var date = DateTime()
+    date.year = 1970
+    date.month = 1
+    date.day = 1
+    date.set_offset(0, -15)
+
+    check $date == "1970-01-01T00:00:00Z-00:15"
 
   test "Date to Epoch Round Trip":
     var date = DateTime()
