@@ -184,7 +184,7 @@ proc set_offset*(self: var DateTime; hours, minutes: int) =
     assert minutes >= 0
 
   self.mhouroffset = hours.int8
-  self.mminuteoffset = hours.int8
+  self.mminuteoffset = minutes.int8
   self.components.incl(DateTimeFragment.Offset)
 
 proc remove*(self: var DateTime; component: DateTimeFragment) =
