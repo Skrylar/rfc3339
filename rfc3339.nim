@@ -5,6 +5,11 @@
 when isMainModule:
   import unittest
 
+const
+  EpochMonth* = 1
+  EpochDay* = 1
+  EpochYear* = 1970
+
 type
   DateTimeFragment* {.pure.} = enum
     Year
@@ -19,11 +24,11 @@ type
   Bitflags = distinct uint8
 
   DateTime* = object
-    year: int16
-    month, day: uint8
-    hour, minute, second: uint8
-    secondfrac: uint8
-    houroffset, minuteoffset: int8
+    myear: int16
+    mmonth, mday: uint8
+    mhour, mminute, msecond: uint8
+    msecondfrac: uint8
+    mhouroffset, mminuteoffset: int8
     components: Bitflags
 
 proc is_leap_year*(year: int): bool =
@@ -64,14 +69,20 @@ proc days_in_month*(year, month: int): int =
     assert(false, "Invalid month.")
     result = 0
 
+proc days_in_year*(year: int): int =
+  ## Calculates the number of days in a given year.
+  assert year >= 0
+  for i in 1..12:
+    inc result, days_in_month(year, i)
+
 template incl(self: var Bitflags; frag: DateTimeFragment) =
-  self = (self.uint8 or (1 shl frag.ord)).Bitflags
+  self = (self.uint8 or (1 shl frag.ord).uint8).Bitflags
 
 template excl(self: var Bitflags; frag: DateTimeFragment) =
-  self = (self.uint8 and (not (1 shl frag.ord))).Bitflags
+  self = (self.uint8 and (not (1 shl frag.ord)).uint8).Bitflags
 
 template `in`(frag: DateTimeFragment; flags: Bitflags): bool =
-  (flags.uint8 and (1 shl frag.ord)) != 0
+  ((flags.uint8 and (1 shl frag.ord.uint8)) != 0)
 
 proc `year=`*(self: var DateTime; year: int) =
   ## Sets the year to a given amount, which must be within [0, 9999].
@@ -80,11 +91,11 @@ proc `year=`*(self: var DateTime; year: int) =
   assert year >= 0
   assert year <= 9999
 
-  self.year = year.int16
+  self.myear = year.int16
   self.components.incl(DateTimeFragment.Year)
 
 proc year*(self: DateTime): int {.inline.} =
-  self.year.int
+  result = self.myear.int
 
 proc `month=`*(self: var DateTime; month: int) =
   ## Sets the month to a given amount, which must be within [1, 12]
@@ -93,11 +104,11 @@ proc `month=`*(self: var DateTime; month: int) =
   assert month > 0
   assert month < 13
 
-  self.month = month.uint8
+  self.mmonth = month.uint8
   self.components.incl(DateTimeFragment.Month)
 
 proc month*(self: DateTime): int {.inline.} =
-  result = self.month.int
+  result = self.mmonth.int
 
 proc `day=`*(self: var DateTime; day: int) =
   assert day >= 1
@@ -106,33 +117,33 @@ proc `day=`*(self: var DateTime; day: int) =
   else:
     assert day <= 31
 
-  self.day = day.uint8
+  self.mday = day.uint8
   self.components.incl(DateTimeFragment.Day)
 
 proc day*(self: DateTime): int {.inline.} =
-  result = self.day.int
+  result = self.mday.int
 
 proc `hour=`*(self: var DateTime; hour: int) =
   ## Sets the hour to a given amount, which must be within [0, 23]
   assert hour >= 0
   assert hour <= 23
 
-  self.hour = hour.uint8
+  self.mhour = hour.uint8
   self.components.incl(DateTimeFragment.Hour)
 
 proc hour*(self: DateTime): int {.inline.} =
-  result = self.hour.int
+  result = self.mhour.int
 
 proc `minute=`*(self: var DateTime; minute: int) =
   ## Sets the minute to a given amount, which must be within [0, 59]
   assert minute >= 0
   assert minute <= 59
 
-  self.minute = minute.uint8
+  self.mminute = minute.uint8
   self.components.incl(DateTimeFragment.Minute)
 
 proc minute*(self: DateTime): int {.inline.} =
-  result = self.minute.int
+  result = self.mminute.int
 
 proc `second=`*(self: var DateTime; second: int) =
   ## Sets the minute to a given amount, which must be within [0, 59].
@@ -144,21 +155,21 @@ proc `second=`*(self: var DateTime; second: int) =
   assert second >= 0
   assert second <= 60
 
-  self.second = second.uint8
+  self.msecond = second.uint8
   self.components.incl(DateTimeFragment.Second)
 
 proc second*(self: DateTime): int =
-  result = self.second.int
+  result = self.msecond.int
 
 proc `second_fraction=`*(self: var DateTime; fraction: int) =
   assert fraction >= 0
   assert fraction <= 9
 
-  self.secondfrac = fraction.uint8
+  self.msecondfrac = fraction.uint8
   self.components.incl(DateTimeFragment.SecondFraction)
 
 proc second_fraction*(self: DateTime): int =
-  result = self.secondfrac.int
+  result = self.msecondfrac.int
 
 proc set_offset*(self: var DateTime; hours, minutes: int) =
   assert hours <= 23
@@ -169,7 +180,58 @@ proc set_offset*(self: var DateTime; hours, minutes: int) =
   if hours != 0:
     assert minutes >= 0
 
-  self.houroffset = hours.int8
-  self.minuteoffset = hours.int8
+  self.mhouroffset = hours.int8
+  self.mminuteoffset = hours.int8
   self.components.incl(DateTimeFragment.Offset)
+
+proc remove*(self: var DateTime; component: DateTimeFragment) =
+  ## Removes a component from the date time; it is effectively set to
+  ## zero.
+  self.components.excl(component)
+
+proc to_number(self: DateTime): int64 =
+  ## Returns the value of a given date time in reference to the number
+  ## of seconds since  the beginning of the Gregorian calendar
+  ## (1/1/0001). Fractional seconds are lost due to the integer format.
+  if DateTimeFragment.Second in self.components:
+    result += self.second.int64
+  if DateTimeFragment.Minute in self.components:
+    if self.minute > 1:
+      result += (self.minute.int64 - 1) * 60
+  if DateTimeFragment.Hour in self.components:
+    if self.hour > 1:
+      result += (self.hour.int64 - 1) * (60 * 60)
+  if DateTimeFragment.Day in self.components:
+    result += (self.day.int64 - 1) * (60 * 60 * 24)
+  if DateTimeFragment.Month in self.components:
+    let y = if DateTimeFragment.Year in self.components: self.year else: 0
+    if self.month > 1:
+      for i in 1..(self.month-1):
+        result += days_in_month(y, i) * (60 * 60 * 24)
+  if DateTimeFragment.Year in self.components:
+    for i in 0..(self.year-1):
+      result += days_in_year(i) * (60 * 60 * 24)
+  if DateTimeFragment.Offset in self.components:
+    result += self.mhouroffset * (60 * 60)
+    result += self.mminuteoffset * 60
+
+proc to_epoch(self: DateTime): int64 =
+  ## Returns the value of a given date time in reference to the Unix
+  ## epoch (1/1/1970). Fractional seconds are lost due to the integer
+  ## format.
+  result = self.to_number - 62167219200
+
+when isMainModule:
+  test "Date to Epoch":
+    var date = DateTime()
+    date.year = 1970
+    date.month = 1
+    date.day = 1
+
+    check DateTimeFragment.Year in date.components == true
+    check DateTimeFragment.Month in date.components == true
+    check DateTimeFragment.Day in date.components == true
+    check DateTimeFragment.Hour in date.components == false
+
+    check date.to_epoch == 0
 
