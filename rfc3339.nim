@@ -192,7 +192,7 @@ proc remove*(self: var DateTime; component: DateTimeFragment) =
   ## zero.
   self.components.excl(component)
 
-proc to_number(self: DateTime): int64 =
+proc to_number*(self: DateTime): int64 =
   ## Returns the value of a given date time in reference to the number
   ## of seconds since  the beginning of the Gregorian calendar
   ## (1/1/0001). Fractional seconds are lost due to the integer format.
@@ -218,13 +218,13 @@ proc to_number(self: DateTime): int64 =
     result += self.mhouroffset * (60 * 60)
     result += self.mminuteoffset * 60
 
-proc to_epoch(self: DateTime): int64 =
+proc to_epoch*(self: DateTime): int64 =
   ## Returns the value of a given date time in reference to the Unix
   ## epoch (1/1/1970). Fractional seconds are lost due to the integer
   ## format.
   result = self.to_number - 62167219200
 
-proc to_date(self: int64): DateTime =
+proc to_date*(self: int64): DateTime =
   # I'm sure it's possible to compute time before Gregorian, although we
   # wouldn't have a means of legally representing it under the RFC.
   # There is no means to have a "negative year."
@@ -296,7 +296,7 @@ proc to_date(self: int64): DateTime =
   if accum > 0:
     result.second = accum.int
 
-proc to_epoch_date(self: int64): DateTime =
+proc to_epoch_date*(self: int64): DateTime =
   result = (self + 62167219200).to_date
 
 when isMainModule:
