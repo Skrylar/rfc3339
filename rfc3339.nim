@@ -84,6 +84,9 @@ template excl(self: var Bitflags; frag: DateTimeFragment) =
 template `in`(frag: DateTimeFragment; flags: Bitflags): bool =
   ((flags.uint8 and (1 shl frag.ord.uint8)) != 0)
 
+template `==`(x, y: Bitflags): bool =
+  x.uint8 == y.uint8
+
 proc `year=`*(self: var DateTime; year: int) =
   ## Sets the year to a given amount, which must be within [0, 9999].
 
@@ -221,6 +224,81 @@ proc to_epoch(self: DateTime): int64 =
   ## format.
   result = self.to_number - 62167219200
 
+proc to_date(self: int64): DateTime =
+  # I'm sure it's possible to compute time before Gregorian, although we
+  # wouldn't have a means of legally representing it under the RFC.
+  # There is no means to have a "negative year."
+  assert self >= 0
+
+  var accum = self
+
+  # figure out how many years we are looking at
+  var y = 0'i64
+  block yearly:
+    for i in 0..9999:
+      let x = days_in_year(i) * (24 * 60 * 60)
+      if accum >= x:
+        accum -= x
+        y += 1
+      else:
+        break yearly
+  if y > 0:
+    result.year = y.int
+
+  # figure out how many months there are
+  var m = 1'i64
+  block monthly:
+    for i in 1..12:
+      let x = days_in_month(y.int, i) * (24 * 60 * 60)
+      if accum >= x:
+        accum -= x
+        m = m + 1
+      else:
+        break monthly
+  if m > 0:
+    result.month = m.int
+
+  var d = 1'i64
+  block daily:
+    for i in 1..60:
+      let x = 24 * 60 * 60
+      if accum >= x:
+        accum -= x
+        d += 1
+      else:
+        break daily
+  if d > 0:
+    result.day = d.int
+
+  var h = 0'i64
+  block hourly:
+    for i in 0..23:
+      let x = 60 * 60
+      if accum >= x:
+        accum -= x
+        h += 1
+      else:
+        break hourly
+  if h > 0:
+    result.hour = h.int
+
+  m = 0'i64
+  block minutely:
+    for i in 0..23:
+      let x = 60
+      if accum >= x:
+        accum -= x
+        h += 1
+      else:
+        break minutely
+  if m > 0:
+    result.minute = m.int
+  if accum > 0:
+    result.second = accum.int
+
+proc to_epoch_date(self: int64): DateTime =
+  result = (self + 62167219200).to_date
+
 when isMainModule:
   test "Date to Epoch":
     var date = DateTime()
@@ -234,4 +312,15 @@ when isMainModule:
     check DateTimeFragment.Hour in date.components == false
 
     check date.to_epoch == 0
+
+  test "Date to Epoch Round Trip":
+    var date = DateTime()
+    date.year = 1970
+    date.month = 1
+    date.day = 1
+
+    let e = date.to_epoch
+    let d2 = e.to_epoch_date
+
+    check d2 == date
 
