@@ -153,7 +153,7 @@ proc `second=`*(self: var DateTime; second: int) =
   ## Note that leap seconds are not enforced here, but are allowed. As
   ## leap seconds cannot be predicted at the time of writing, trying to
   ## enforce them is liable to cause mysterious frustration with
-  ## developers and end users who are forced to wait for on 
+  ## developers and end users who are forced to wait for on
   ## updates their (suddenly, by committee order) broken code.
   assert second >= 0
   assert second <= 60
