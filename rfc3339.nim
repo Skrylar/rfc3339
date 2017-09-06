@@ -2,6 +2,8 @@
 # https://tools.ietf.org/html/rfc3339
 # https://www.timeanddate.com/date/leapyear.html
 
+import parseutils
+
 when isMainModule:
   import unittest
 
@@ -350,24 +352,27 @@ proc to_fulltime_string*(self: DateTime): string =
     result &= "."
     result &= $self.second_fraction
 
-  if DateTimeFragment.Offset in self.components:
-    result &= "Z"
+  result &= "Z"
 
-    if self.mhouroffset == 0:
-      if self.mminuteoffset >= 0:
+  block offset:
+    let ho = if DateTimeFragment.Offset in self.components: self.mhouroffset else: 0
+    let mo = if DateTimeFragment.Offset in self.components: self.mminuteoffset else: 0
+
+    if ho == 0:
+      if mo >= 0:
         result &= "+"
       else:
         result &= "-"
     else:
-      if self.mhouroffset >= 0:
+      if ho >= 0:
         result &= "+"
 
-    if self.mhouroffset <= 9:
+    if ho <= 9:
       result &= "0"
-    result &= $abs(self.mhouroffset)
+    result &= $abs(ho)
     result &= ":"
 
-    let m = abs(self.mminuteoffset)
+    let m = abs(mo)
     if m <= 9:
       result &= "0"
     result &= $m
@@ -377,6 +382,108 @@ proc `$`*(self: DateTime): string =
   result &= self.to_fulldate_string
   result &= "T"
   result &= self.to_fulltime_string
+
+proc to_date*(self: string): DateTime =
+  var i = 0
+
+  # NB: while this is not unicode safe, rfc3339 dates consist solely of
+  # 7-bit characters and thus we can do this without recourse
+  template getch(): char =
+    inc i
+    if i > self.high:
+      break
+    self[i-1]
+
+  template getdigit(): char =
+    let x = getch
+    if x < '0' or x > '9':
+      break
+    x
+
+  var scratch = newString(4)
+  var work = DateTime()
+
+  block date:
+    var x: int
+    # load year
+    scratch[0] = getdigit
+    scratch[1] = getdigit
+    scratch[2] = getdigit
+    scratch[3] = getdigit
+    discard parseint(scratch, x)
+    work.myear = x.int16
+
+    if getch != '-': break
+
+    # load month
+    setLen(scratch, 2)
+    scratch[0] = getdigit
+    scratch[1] = getdigit
+    discard parseint(scratch, x)
+    work.mmonth = x.uint8
+
+    if getch != '-': break
+
+    #setLen(scratch, 2)
+    scratch[0] = getdigit
+    scratch[1] = getdigit
+    discard parseint(scratch, x)
+    work.mday = x.uint8
+
+    if getch != 'T': break
+
+    #setLen(scratch, 2)
+    scratch[0] = getdigit
+    scratch[1] = getdigit
+    discard parseint(scratch, x)
+    work.mhour = x.uint8
+
+    if getch != ':': break
+
+    #setLen(scratch, 2)
+    scratch[0] = getdigit
+    scratch[1] = getdigit
+    discard parseint(scratch, x)
+    work.mminute = x.uint8
+
+    if getch != ':': break
+
+    #setLen(scratch, 2)
+    scratch[0] = getdigit
+    scratch[1] = getdigit
+    discard parseint(scratch, x)
+    work.msecond = x.uint8
+
+    if getch == '.':
+      setLen(scratch, 1)
+      scratch[0] = getdigit
+      discard parseint(scratch, x)
+      work.msecondfrac = x.uint8
+
+    if getch != 'Z': break
+
+    let sign = getch
+    if sign != '-' and sign != '+': break
+
+    setLen(scratch, 2)
+    scratch[0] = getdigit
+    scratch[1] = getdigit
+    discard parseint(scratch, x)
+    work.mhouroffset = x.int8
+    scratch[0] = getdigit
+    scratch[1] = getdigit
+    discard parseint(scratch, x)
+    work.mminuteoffset = x.int8
+
+    if sign == '-':
+      if work.mhouroffset > 0:
+        work.mhouroffset *= -1
+      else:
+        work.mminuteoffset *= -1
+
+    return work
+
+  return
 
 when isMainModule:
   test "Date to Epoch":
@@ -399,25 +506,16 @@ when isMainModule:
     date.day = 1
 
     check date.to_fulldate_string() == "1970-01-01"
-    check $date == "1970-01-01T00:00:00"
+    check $date == "1970-01-01T00:00:00Z+00:00"
 
-  test "Positive Time Offsets to String":
-    var date = DateTime()
+  test "String to Epoch":
+    var date = "1970-01-01T00:00:00Z+00:00".to_date()
     date.year = 1970
     date.month = 1
     date.day = 1
-    date.set_offset(1, 0)
 
-    check $date == "1970-01-01T00:00:00Z+01:00"
-
-  test "Negative Time Offsets to String":
-    var date = DateTime()
-    date.year = 1970
-    date.month = 1
-    date.day = 1
-    date.set_offset(0, -15)
-
-    check $date == "1970-01-01T00:00:00Z-00:15"
+    check date.to_fulldate_string() == "1970-01-01"
+    check $date == "1970-01-01T00:00:00Z+00:00"
 
   test "Date to Epoch Round Trip":
     var date = DateTime()
@@ -429,4 +527,23 @@ when isMainModule:
     let d2 = e.to_epoch_date
 
     check d2 == date
+
+  suite "Time Offsets":
+    test "Positive Time Offsets to String":
+      var date = DateTime()
+      date.year = 1970
+      date.month = 1
+      date.day = 1
+      date.set_offset(1, 0)
+
+      check $date == "1970-01-01T00:00:00Z+01:00"
+
+    test "Negative Time Offsets to String":
+      var date = DateTime()
+      date.year = 1970
+      date.month = 1
+      date.day = 1
+      date.set_offset(0, -15)
+
+      check $date == "1970-01-01T00:00:00Z-00:15"
 
