@@ -14,6 +14,9 @@ const
 
 type
   DateTimeFragment* {.pure.} = enum
+    ## A fragment of a DateTime object. As not all fields are always
+    ## available, this enum tracks the difference between "zero minutes"
+    ## and "unspecified minutes."
     Year
     Month
     Day
@@ -26,6 +29,7 @@ type
   Bitflags = distinct uint8
 
   DateTime* = object
+    ## An RFC3339 date/time object.
     myear: int16
     mmonth, mday: uint8
     mhour, mminute, msecond: uint8
@@ -116,6 +120,8 @@ proc month*(self: DateTime): int {.inline.} =
   result = self.mmonth.int
 
 proc `day=`*(self: var DateTime; day: int) =
+  ## Sets the day of a year. If no month is set, the day must be less
+  ## than 32. If a month is set, must be a valid day within that month.
   assert day >= 1
   if (DateTimeFragment.Month in self.components) and (DateTimeFragment.Year in self.components):
     assert day <= days_in_month(self.year.int, self.month.int)
@@ -167,6 +173,8 @@ proc second*(self: DateTime): int =
   result = self.msecond.int
 
 proc `second_fraction=`*(self: var DateTime; fraction: int) =
+  ## Sets the fraction of a second represented by this time object. Must
+  ## be in the range of [0, 9]
   assert fraction >= 0
   assert fraction <= 9
 
@@ -177,6 +185,11 @@ proc second_fraction*(self: DateTime): int =
   result = self.msecondfrac.int
 
 proc set_offset*(self: var DateTime; hours, minutes: int) =
+  ## Sets the offset (timezone) of this time object. Note that when
+  ## converting to types with no timezone field, the offset is applied
+  ## (and the metadata is lost.) A round-trip to epoch and back will
+  ## represent the same moment in time, but will not know that it
+  ## belongs to this timezone.
   assert hours <= 23
   assert hours >= -23
   assert minutes <= 59
@@ -227,6 +240,9 @@ proc to_epoch*(self: DateTime): int64 =
   result = self.to_number - 62167219200
 
 proc to_date*(self: int64): DateTime =
+  ## Returns the value of a given time in reference to the start of the
+  ## Gregorian calendar (1/1/0001)
+
   # I'm sure it's possible to compute time before Gregorian, although we
   # wouldn't have a means of legally representing it under the RFC.
   # There is no means to have a "negative year."
@@ -299,6 +315,9 @@ proc to_date*(self: int64): DateTime =
     result.second = accum.int
 
 proc to_epoch_date*(self: int64): DateTime =
+  ## Returns the value of a given date time in reference to the Unix
+  ## epoch (1/1/1970). Fractional seconds are lost due to the integer
+  ## format.
   result = (self + 62167219200).to_date
 
 proc to_fulldate_string*(self: DateTime): string =
@@ -329,6 +348,8 @@ proc to_fulldate_string*(self: DateTime): string =
   result &= $d
 
 proc to_fulltime_string*(self: DateTime): string =
+  ## Returns a conversion of this date time object to a "full-time"
+  ## string, which is HH:MM:SS.FZ+HH:MM.
   let h = if DateTimeFragment.Hour in self.components: self.hour else: 0
   let m = if DateTimeFragment.Minute in self.components: self.minute else: 0
   let s = if DateTimeFragment.Second in self.components: self.second else: 0
@@ -378,12 +399,17 @@ proc to_fulltime_string*(self: DateTime): string =
     result &= $m
 
 proc `$`*(self: DateTime): string =
+  ## Returns a full date and time pair in ISO specification,
+  ## "YYYY-MM-DDTHH:MM:SS.FZ+HH:MM"
   result = newString(0)
   result &= self.to_fulldate_string
   result &= "T"
   result &= self.to_fulltime_string
 
 proc to_date*(self: string): DateTime =
+  ## Parses a string as an RFC3339 date, returning an object. Checking
+  ## the components of the returned date time allows you to determine a
+  ## failed parse, or when optional fields were not read.
   var i = 0
 
   # NB: while this is not unicode safe, rfc3339 dates consist solely of
