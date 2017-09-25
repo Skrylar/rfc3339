@@ -400,30 +400,33 @@ proc to_fulltime_string*(self: DateTime): string =
     result &= "."
     result &= $self.second_fraction
 
-  result &= "Z"
-
   block offset:
     let ho = if DateTimeFragment.Offset in self.components: self.mhouroffset else: 0
     let mo = if DateTimeFragment.Offset in self.components: self.mminuteoffset else: 0
 
-    if ho == 0:
-      if mo >= 0:
-        result &= "+"
-      else:
-        result &= "-"
+    if (ho == 0) and (mo == 0):
+      result &= "Z"
     else:
-      if ho >= 0:
-        result &= "+"
+      if ho == 0:
+        if mo >= 0:
+          result &= "+"
+        else:
+          result &= "-"
+      else:
+        if ho >= 0:
+          result &= "+"
+        else:
+          result &= "-"
 
-    if ho <= 9:
-      result &= "0"
-    result &= $abs(ho)
-    result &= ":"
+      if ho <= 9:
+        result &= "0"
+      result &= $abs(ho)
+      result &= ":"
 
-    let m = abs(mo)
-    if m <= 9:
-      result &= "0"
-    result &= $m
+      let m = abs(mo)
+      if m <= 9:
+        result &= "0"
+      result &= $m
 
 proc `$`*(self: DateTime): string =
   ## Returns a full date and time pair in ISO specification,
@@ -552,24 +555,6 @@ when isMainModule:
 
     check date.to_epoch == 0
 
-  test "Epoch to Full Date":
-    var date = DateTime()
-    date.year = 1970
-    date.month = 1
-    date.day = 1
-
-    check date.to_fulldate_string() == "1970-01-01"
-    check $date == "1970-01-01T00:00:00Z+00:00"
-
-  test "String to Epoch":
-    var date = "1970-01-01T00:00:00Z+00:00".to_date()
-    date.year = 1970
-    date.month = 1
-    date.day = 1
-
-    check date.to_fulldate_string() == "1970-01-01"
-    check $date == "1970-01-01T00:00:00Z+00:00"
-
   test "Date to Epoch Round Trip":
     var date = DateTime()
     date.year = 1970
@@ -581,22 +566,53 @@ when isMainModule:
 
     check d2 == date
 
-  suite "Time Offsets":
-    test "Positive Time Offsets to String":
+  suite "Import":
+    test "String to Epoch":
+      var date = "1970-01-01T00:00:00Z+00:00".to_date()
+      date.year = 1970
+      date.month = 1
+      date.day = 1
+
+      check date.to_fulldate_string() == "1970-01-01"
+      check $date == "1970-01-01T00:00:00-00:30"
+
+  suite "Export":
+    test "Epoch to Full Date (No Timezone)":
       var date = DateTime()
       date.year = 1970
       date.month = 1
       date.day = 1
-      date.set_offset(1, 0)
 
-      check $date == "1970-01-01T00:00:00Z+01:00"
+      check date.to_fulldate_string() == "1970-01-01"
+      check $date == "1970-01-01T00:00:00Z"
 
-    test "Negative Time Offsets to String":
+    test "Epoch to Full Date (With Timezone)":
       var date = DateTime()
       date.year = 1970
       date.month = 1
       date.day = 1
-      date.set_offset(0, -15)
+      date.set_offset(1, 30)
 
-      check $date == "1970-01-01T00:00:00Z-00:15"
+      check date.to_fulldate_string() == "1970-01-01"
+      check $date == "1970-01-01T00:00:00+01:30"
+
+    test "Epoch to Full Date (With Negative Hour Timezone)":
+      var date = DateTime()
+      date.year = 1970
+      date.month = 1
+      date.day = 1
+      date.set_offset(-1, 30)
+
+      check date.to_fulldate_string() == "1970-01-01"
+      check $date == "1970-01-01T00:00:00-01:30"
+    
+    test "Epoch to Full Date (With Negative Minute Timezone)":
+      var date = DateTime()
+      date.year = 1970
+      date.month = 1
+      date.day = 1
+      date.set_offset(0, -30)
+
+      check date.to_fulldate_string() == "1970-01-01"
+      check $date == "1970-01-01T00:00:00-00:30"
 
