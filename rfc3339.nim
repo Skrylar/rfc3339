@@ -35,9 +35,7 @@ when isMainModule:
   import unittest
 
 const
-  EpochMonth* = 1
-  EpochDay* = 1
-  EpochYear* = 1970
+  EpochSeconds = 62167219200
 
 type
   DateTimeFragment* {.pure.} = enum
@@ -264,7 +262,7 @@ proc to_epoch*(self: DateTime): int64 =
   ## Returns the value of a given date time in reference to the Unix
   ## epoch (1/1/1970). Fractional seconds are lost due to the integer
   ## format.
-  result = self.to_number - 62167219200
+  result = self.to_number - EpochSeconds
 
 proc to_date*(self: int64): DateTime =
   ## Returns the value of a given time in reference to the start of the
@@ -345,7 +343,7 @@ proc to_epoch_date*(self: int64): DateTime =
   ## Returns the value of a given date time in reference to the Unix
   ## epoch (1/1/1970). Fractional seconds are lost due to the integer
   ## format.
-  result = (self + 62167219200).to_date
+  result = (self + EpochSeconds).to_date
 
 proc to_fulldate_string*(self: DateTime): string =
   ## Emits a full-date from the date time, in the format YYYY-MM-DD.
@@ -567,6 +565,12 @@ when isMainModule:
     check d2 == date
 
   suite "Import":
+    test "Epoch to Date":
+      var date = 0.to_epoch_date()
+
+      check date.to_fulldate_string() == "1970-01-01"
+      check $date == "1970-01-01T00:00:00Z"
+
     test "String to Epoch":
       var date = "1970-01-01T00:00:00Z+00:00".to_date()
       date.year = 1970
@@ -574,7 +578,7 @@ when isMainModule:
       date.day = 1
 
       check date.to_fulldate_string() == "1970-01-01"
-      check $date == "1970-01-01T00:00:00-00:30"
+      check $date == "1970-01-01T00:00:00Z"
 
   suite "Export":
     test "Epoch to Full Date (No Timezone)":
