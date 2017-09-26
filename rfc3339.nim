@@ -35,7 +35,8 @@ when isMainModule:
   import unittest
 
 const
-  EpochSeconds = 62167219200
+  EpochSeconds = 62135683200
+  YearZeroSeconds = 31622400
 
 type
   DateTimeFragment* {.pure.} = enum
@@ -245,7 +246,7 @@ proc to_number*(self: DateTime): int64 =
     if self.hour > 1:
       result += (self.hour.int64 - 1) * (60 * 60)
   if DateTimeFragment.Day in self.components:
-    result += (self.day.int64 - 1) * (60 * 60 * 24)
+    result += self.day.int64 * (60 * 60 * 24)
   if DateTimeFragment.Month in self.components:
     let y = if DateTimeFragment.Year in self.components: self.year else: 0
     if self.month > 1:
@@ -257,6 +258,8 @@ proc to_number*(self: DateTime): int64 =
   if DateTimeFragment.Offset in self.components:
     result += self.mhouroffset * (60 * 60)
     result += self.mminuteoffset * 60
+
+  result -= YearZeroSeconds
 
 proc to_epoch*(self: DateTime): int64 =
   ## Returns the value of a given date time in reference to the Unix
@@ -271,9 +274,9 @@ proc to_date*(self: int64): DateTime =
   # I'm sure it's possible to compute time before Gregorian, although we
   # wouldn't have a means of legally representing it under the RFC.
   # There is no means to have a "negative year."
-  assert self >= 0
+  assert self >= -YearZeroSeconds
 
-  var accum = self
+  var accum = self + YearZeroSeconds
 
   # figure out how many years we are looking at
   var y = 0'i64
@@ -289,7 +292,7 @@ proc to_date*(self: int64): DateTime =
     result.year = y.int
 
   # figure out how many months there are
-  var m = 1'i64
+  var m = 0'i64
   block monthly:
     for i in 1..12:
       let x = days_in_month(y.int, i) * (24 * 60 * 60)
@@ -298,10 +301,11 @@ proc to_date*(self: int64): DateTime =
         m = m + 1
       else:
         break monthly
+  m = min(m, 1)
   if m > 0:
     result.month = m.int
 
-  var d = 1'i64
+  var d = 0'i64
   block daily:
     for i in 1..60:
       let x = 24 * 60 * 60
@@ -310,6 +314,7 @@ proc to_date*(self: int64): DateTime =
         d += 1
       else:
         break daily
+  d = min(d, 1)
   if d > 0:
     result.day = d.int
 
@@ -425,6 +430,9 @@ proc to_fulltime_string*(self: DateTime): string =
       if m <= 9:
         result &= "0"
       result &= $m
+
+proc `==`*(self, other: DateTime): bool =
+  return self.to_number == other.to_number
 
 proc `$`*(self: DateTime): string =
   ## Returns a full date and time pair in ISO specification,
@@ -560,6 +568,9 @@ when isMainModule:
     date.day = 1
 
     let e = date.to_epoch
+
+    check e == 0
+
     let d2 = e.to_epoch_date
 
     check d2 == date
@@ -573,12 +584,21 @@ when isMainModule:
 
     test "String to Epoch":
       var date = "1970-01-01T00:00:00Z+00:00".to_date()
-      date.year = 1970
-      date.month = 1
-      date.day = 1
 
       check date.to_fulldate_string() == "1970-01-01"
       check $date == "1970-01-01T00:00:00Z"
+
+    test "Gregorian Start to Date":
+      var date = 0.to_date()
+
+      check date.to_fulldate_string() == "0001-01-01"
+      check $date == "0001-01-01T00:00:00Z"
+
+    test "String to Gregorian Start":
+      var date = "0001-01-01T00:00:00Z".to_date()
+
+      check date.to_fulldate_string() == "0001-01-01"
+      check $date == "0001-01-01T00:00:00Z"
 
   suite "Export":
     test "Epoch to Full Date (No Timezone)":
@@ -609,7 +629,7 @@ when isMainModule:
 
       check date.to_fulldate_string() == "1970-01-01"
       check $date == "1970-01-01T00:00:00-01:30"
-    
+
     test "Epoch to Full Date (With Negative Minute Timezone)":
       var date = DateTime()
       date.year = 1970
