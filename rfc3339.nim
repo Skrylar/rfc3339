@@ -451,10 +451,13 @@ proc to_date*(self: string): DateTime =
   # NB: while this is not unicode safe, rfc3339 dates consist solely of
   # 7-bit characters and thus we can do this without recourse
   template getch(): char =
-    inc i
     if i > self.high:
       break
+    inc i
     self[i-1]
+
+  template ungetch() =
+    dec i
 
   template getdigit(): char =
     let x = getch
@@ -474,6 +477,7 @@ proc to_date*(self: string): DateTime =
     scratch[3] = getdigit
     discard parseint(scratch, x)
     work.myear = x.int16
+    work.components.incl(DateTimeFragment.Year)
 
     if getch != '-': break
 
@@ -483,6 +487,7 @@ proc to_date*(self: string): DateTime =
     scratch[1] = getdigit
     discard parseint(scratch, x)
     work.mmonth = x.uint8
+    work.components.incl(DateTimeFragment.Month)
 
     if getch != '-': break
 
@@ -491,6 +496,7 @@ proc to_date*(self: string): DateTime =
     scratch[1] = getdigit
     discard parseint(scratch, x)
     work.mday = x.uint8
+    work.components.incl(DateTimeFragment.Day)
 
     if getch != 'T': break
 
@@ -499,6 +505,7 @@ proc to_date*(self: string): DateTime =
     scratch[1] = getdigit
     discard parseint(scratch, x)
     work.mhour = x.uint8
+    work.components.incl(DateTimeFragment.Hour)
 
     if getch != ':': break
 
@@ -507,6 +514,7 @@ proc to_date*(self: string): DateTime =
     scratch[1] = getdigit
     discard parseint(scratch, x)
     work.mminute = x.uint8
+    work.components.incl(DateTimeFragment.Minute)
 
     if getch != ':': break
 
@@ -515,33 +523,40 @@ proc to_date*(self: string): DateTime =
     scratch[1] = getdigit
     discard parseint(scratch, x)
     work.msecond = x.uint8
+    work.components.incl(DateTimeFragment.Second)
+
 
     if getch == '.':
       setLen(scratch, 1)
       scratch[0] = getdigit
       discard parseint(scratch, x)
       work.msecondfrac = x.uint8
-
-    if getch != 'Z': break
+      work.components.incl(DateTimeFragment.SecondFraction)
+    else:
+      ungetch()
 
     let sign = getch
-    if sign != '-' and sign != '+': break
+    if sign == 'Z':
+      discard
+    elif sign == '-' or sign == '+':
+      setLen(scratch, 2)
+      scratch[0] = getdigit
+      scratch[1] = getdigit
+      discard parseint(scratch, x)
+      work.mhouroffset = x.int8
+      scratch[0] = getdigit
+      scratch[1] = getdigit
+      discard parseint(scratch, x)
+      work.mminuteoffset = x.int8
 
-    setLen(scratch, 2)
-    scratch[0] = getdigit
-    scratch[1] = getdigit
-    discard parseint(scratch, x)
-    work.mhouroffset = x.int8
-    scratch[0] = getdigit
-    scratch[1] = getdigit
-    discard parseint(scratch, x)
-    work.mminuteoffset = x.int8
-
-    if sign == '-':
-      if work.mhouroffset > 0:
-        work.mhouroffset *= -1
-      else:
-        work.mminuteoffset *= -1
+      if sign == '-':
+        if work.mhouroffset > 0:
+          work.mhouroffset *= -1
+        else:
+          work.mminuteoffset *= -1
+      work.components.incl(DateTimeFragment.Offset)
+    else:
+      break
 
     return work
 
@@ -585,6 +600,8 @@ when isMainModule:
     test "String to Epoch":
       var date = "1970-01-01T00:00:00Z+00:00".to_date()
 
+      check date.year == 1970
+
       check date.to_fulldate_string() == "1970-01-01"
       check $date == "1970-01-01T00:00:00Z"
 
@@ -596,6 +613,8 @@ when isMainModule:
 
     test "String to Gregorian Start":
       var date = "0001-01-01T00:00:00Z".to_date()
+
+      check date.year == 1
 
       check date.to_fulldate_string() == "0001-01-01"
       check $date == "0001-01-01T00:00:00Z"
