@@ -35,8 +35,8 @@ when isMainModule:
   import unittest
 
 const
-  EpochSeconds = 62135683200
   YearZeroSeconds = 31622400
+  EpochSeconds = 62167219200 - YearZeroSeconds
 
 type
   DateTimeFragment* {.pure.} = enum
@@ -240,20 +240,17 @@ proc to_number*(self: DateTime): int64 =
   if DateTimeFragment.Second in self.components:
     result += self.second.int64
   if DateTimeFragment.Minute in self.components:
-    if self.minute > 1:
-      result += (self.minute.int64 - 1) * 60
+    result += (self.minute.int64) * 60
   if DateTimeFragment.Hour in self.components:
-    if self.hour > 1:
-      result += (self.hour.int64 - 1) * (60 * 60)
+    result += (self.hour.int64) * (60 * 60)
   if DateTimeFragment.Day in self.components:
-    result += self.day.int64 * (60 * 60 * 24)
+    result += (self.day.int64-1) * (60 * 60 * 24)
   if DateTimeFragment.Month in self.components:
     let y = if DateTimeFragment.Year in self.components: self.year else: 0
-    if self.month > 1:
-      for i in 1..(self.month-1):
-        result += days_in_month(y, i) * (60 * 60 * 24)
+    for i in 1..self.month-1:
+      result += days_in_month(y, i) * (60 * 60 * 24)
   if DateTimeFragment.Year in self.components:
-    for i in 0..(self.year-1):
+    for i in 0..(self.year - 1):
       result += days_in_year(i) * (60 * 60 * 24)
   if DateTimeFragment.Offset in self.components:
     result += self.mhouroffset * (60 * 60)
@@ -285,38 +282,33 @@ proc to_date*(self: int64): DateTime =
       let x = days_in_year(i) * (24 * 60 * 60)
       if accum >= x:
         accum -= x
-        y += 1
+        inc y
       else:
         break yearly
-  if y > 0:
-    result.year = y.int
+  result.year = y.int
 
   # figure out how many months there are
-  var m = 0'i64
+  var m = 1'i64
   block monthly:
     for i in 1..12:
       let x = days_in_month(y.int, i) * (24 * 60 * 60)
       if accum >= x:
         accum -= x
-        m = m + 1
+        inc m
       else:
         break monthly
-  m = min(m, 1)
-  if m > 0:
-    result.month = m.int
+  result.month = m.int
 
-  var d = 0'i64
+  var d = 1'i64
   block daily:
+    let x = 24 * 60 * 60
     for i in 1..60:
-      let x = 24 * 60 * 60
       if accum >= x:
         accum -= x
-        d += 1
+        inc d
       else:
         break daily
-  d = min(d, 1)
-  if d > 0:
-    result.day = d.int
+  result.day = d.int
 
   var h = 0'i64
   block hourly:
@@ -332,11 +324,11 @@ proc to_date*(self: int64): DateTime =
 
   m = 0'i64
   block minutely:
-    for i in 0..23:
+    for i in 0..60:
       let x = 60
       if accum >= x:
         accum -= x
-        h += 1
+        m += 1
       else:
         break minutely
   if m > 0:
@@ -659,3 +651,46 @@ when isMainModule:
       check date.to_fulldate_string() == "1970-01-01"
       check $date == "1970-01-01T00:00:00-00:30"
 
+  suite "Regression":
+    test "to_number().to_date() gives incorrect result if hh:mm:ss is set #4":
+      const
+        answer = "2017-09-08T01:02:03Z"
+      var y: DateTime
+
+      y.year = 2017
+      y.month = 9
+      y.day = 8
+      y.hour = 1
+      y.minute = 2
+      y.second = 3
+
+      check $y == answer
+      check $(y.to_number().to_date()) == answer
+
+    test "to_number looses an hour and a minute #6":
+      const
+        answer = "2017-09-08T17:25:59Z"
+      var y: DateTime
+      y.year = 2017
+      y.month = 9
+      y.day = 8
+      y.hour = 17
+      y.minute = 25
+      y.second = 59
+
+      check $y == answer
+      check $(y.to_number().to_date()) == answer
+
+  test "december niggles":
+    const
+      answer = "2017-12-08T17:25:59Z"
+    var y: DateTime
+    y.year = 2017
+    y.month = 12
+    y.day = 8
+    y.hour = 17
+    y.minute = 25
+    y.second = 59
+
+    check $y == answer
+    check $(y.to_number().to_date()) == answer
