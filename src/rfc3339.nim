@@ -1,6 +1,6 @@
 # Written by Joshua "Skrylar" Cearley.
 #
-# Copyright 2017 Joshua Cearley
+# Copyright 2017-2019 Joshua Cearley
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -30,9 +30,6 @@
 # https://www.timeanddate.com/date/leapyear.html
 
 import parseutils
-
-when isMainModule:
-  import unittest
 
 const
   YearZeroSeconds = 31622400
@@ -72,14 +69,6 @@ proc is_leap_year*(year: int): bool =
   if rule2 and (not rule3):
     return false
   return rule1
-
-when isMainModule:
-  test "Leap Years":
-    check is_leap_year(2016) == true
-    check is_leap_year(2017) == false
-    check is_leap_year(2000) == true
-    check is_leap_year(2001) == false
-    check is_leap_year(2020) == true
 
 proc days_in_month*(year, month: int): int =
   ## Returns the number of days in a given month, [1, 12], from the
@@ -555,142 +544,170 @@ proc to_date*(self: string): DateTime =
   return
 
 when isMainModule:
-  test "Date to Epoch":
-    var date = DateTime()
-    date.year = 1970
-    date.month = 1
-    date.day = 1
+    echo "TAP version 13"
 
-    check DateTimeFragment.Year in date.components == true
-    check DateTimeFragment.Month in date.components == true
-    check DateTimeFragment.Day in date.components == true
-    check DateTimeFragment.Hour in date.components == false
+    var tests = 1
+    proc ok(condition: bool) =
+        if condition:
+            echo("ok ", tests)
+        else:
+            echo("not ok ", tests)
+        inc tests
 
-    check date.to_epoch == 0
+    echo "# Leap Years"
+    block:
+        ok(is_leap_year(2016) == true)
+        ok(is_leap_year(2017) == false)
+        ok(is_leap_year(2000) == true)
+        ok(is_leap_year(2001) == false)
+        ok(is_leap_year(2020) == true)
 
-  test "Date to Epoch Round Trip":
-    var date = DateTime()
-    date.year = 1970
-    date.month = 1
-    date.day = 1
+    echo "# Date to Epoch"
+    block:
+        var date = DateTime()
+        date.year = 1970
+        date.month = 1
+        date.day = 1
 
-    let e = date.to_epoch
+        ok(DateTimeFragment.Year in date.components == true)
+        ok(DateTimeFragment.Month in date.components == true)
+        ok(DateTimeFragment.Day in date.components == true)
+        ok(DateTimeFragment.Hour in date.components == false)
 
-    check e == 0
+        ok(date.to_epoch == 0)
 
-    let d2 = e.to_epoch_date
+    echo "# Date to Epoch Round Trip"
+    block:
+        var date = DateTime()
+        date.year = 1970
+        date.month = 1
+        date.day = 1
 
-    check d2 == date
+        let e = date.to_epoch
+        ok(e == 0)
 
-  suite "Import":
-    test "Epoch to Date":
-      var date = 0.to_epoch_date()
+        let d2 = e.to_epoch_date
+        ok(d2 == date)
 
-      check date.to_fulldate_string() == "1970-01-01"
-      check $date == "1970-01-01T00:00:00Z"
+    echo "# Epoch to Date"
+    block:
+        var date = 0.to_epoch_date()
 
-    test "String to Epoch":
-      var date = "1970-01-01T00:00:00Z+00:00".to_date()
+        ok(date.to_fulldate_string() == "1970-01-01")
+        ok($date == "1970-01-01T00:00:00Z")
 
-      check date.year == 1970
+    echo "# String to Epoch"
+    block:
+        var date = "1970-01-01T00:00:00Z+00:00".to_date()
 
-      check date.to_fulldate_string() == "1970-01-01"
-      check $date == "1970-01-01T00:00:00Z"
+        ok(date.year == 1970)
 
-    test "Gregorian Start to Date":
-      var date = 0.to_date()
+        ok(date.to_fulldate_string() == "1970-01-01")
+        ok($date == "1970-01-01T00:00:00Z")
 
-      check date.to_fulldate_string() == "0001-01-01"
-      check $date == "0001-01-01T00:00:00Z"
+    echo "# Gregorian Start to Date"
+    block:
+        var date = 0.to_date()
 
-    test "String to Gregorian Start":
-      var date = "0001-01-01T00:00:00Z".to_date()
+        ok(date.to_fulldate_string() == "0001-01-01")
+        ok($date == "0001-01-01T00:00:00Z")
 
-      check date.year == 1
+    echo "# String to Gregorian Start"
+    block:
+        var date = "0001-01-01T00:00:00Z".to_date()
 
-      check date.to_fulldate_string() == "0001-01-01"
-      check $date == "0001-01-01T00:00:00Z"
+        ok(date.year == 1)
 
-  suite "Export":
-    test "Epoch to Full Date (No Timezone)":
-      var date = DateTime()
-      date.year = 1970
-      date.month = 1
-      date.day = 1
+        ok(date.to_fulldate_string() == "0001-01-01")
+        ok($date == "0001-01-01T00:00:00Z")
 
-      check date.to_fulldate_string() == "1970-01-01"
-      check $date == "1970-01-01T00:00:00Z"
+    echo "# Epoch to Full Date (No Timezone)"
+    block:
+        var date = DateTime()
+        date.year = 1970
+        date.month = 1
+        date.day = 1
 
-    test "Epoch to Full Date (With Timezone)":
-      var date = DateTime()
-      date.year = 1970
-      date.month = 1
-      date.day = 1
-      date.set_offset(1, 30)
+        ok(date.to_fulldate_string() == "1970-01-01")
+        ok($date == "1970-01-01T00:00:00Z")
 
-      check date.to_fulldate_string() == "1970-01-01"
-      check $date == "1970-01-01T00:00:00+01:30"
+    echo "# Epoch to Full Date (With Timezone)"
+    block:
+        var date = DateTime()
+        date.year = 1970
+        date.month = 1
+        date.day = 1
+        date.set_offset(1, 30)
 
-    test "Epoch to Full Date (With Negative Hour Timezone)":
-      var date = DateTime()
-      date.year = 1970
-      date.month = 1
-      date.day = 1
-      date.set_offset(-1, 30)
+        ok(date.to_fulldate_string() == "1970-01-01")
+        ok($date == "1970-01-01T00:00:00+01:30")
 
-      check date.to_fulldate_string() == "1970-01-01"
-      check $date == "1970-01-01T00:00:00-01:30"
+    echo "Epoch to Full Date (With Negative Hour Timezone)"
+    block:
+        var date = DateTime()
+        date.year = 1970
+        date.month = 1
+        date.day = 1
+        date.set_offset(-1, 30)
 
-    test "Epoch to Full Date (With Negative Minute Timezone)":
-      var date = DateTime()
-      date.year = 1970
-      date.month = 1
-      date.day = 1
-      date.set_offset(0, -30)
+        ok(date.to_fulldate_string() == "1970-01-01")
+        ok($date == "1970-01-01T00:00:00-01:30")
 
-      check date.to_fulldate_string() == "1970-01-01"
-      check $date == "1970-01-01T00:00:00-00:30"
+    echo "Epoch to Full Date (With Negative Minute Timezone)"
+    block:
+        var date = DateTime()
+        date.year = 1970
+        date.month = 1
+        date.day = 1
+        date.set_offset(0, -30)
 
-  suite "Regression":
-    test "to_number().to_date() gives incorrect result if hh:mm:ss is set #4":
-      const
-        answer = "2017-09-08T01:02:03Z"
-      var y: DateTime
+        ok(date.to_fulldate_string() == "1970-01-01")
+        ok($date == "1970-01-01T00:00:00-00:30")
 
-      y.year = 2017
-      y.month = 9
-      y.day = 8
-      y.hour = 1
-      y.minute = 2
-      y.second = 3
+    echo "# to_number().to_date() gives incorrect result if hh:mm:ss is set #4"
+    block:
+        const
+            answer = "2017-09-08T01:02:03Z"
+        var y: DateTime
 
-      check $y == answer
-      check $(y.to_number().to_date()) == answer
+        y.year = 2017
+        y.month = 9
+        y.day = 8
+        y.hour = 1
+        y.minute = 2
+        y.second = 3
 
-    test "to_number looses an hour and a minute #6":
-      const
-        answer = "2017-09-08T17:25:59Z"
-      var y: DateTime
-      y.year = 2017
-      y.month = 9
-      y.day = 8
-      y.hour = 17
-      y.minute = 25
-      y.second = 59
+        ok($y == answer)
+        ok($(y.to_number().to_date()) == answer)
 
-      check $y == answer
-      check $(y.to_number().to_date()) == answer
+    echo "# to_number looses an hour and a minute #6"
+    block:
+        const
+            answer = "2017-09-08T17:25:59Z"
+        var y: DateTime
+        y.year = 2017
+        y.month = 9
+        y.day = 8
+        y.hour = 17
+        y.minute = 25
+        y.second = 59
 
-  test "december niggles":
-    const
-      answer = "2017-12-08T17:25:59Z"
-    var y: DateTime
-    y.year = 2017
-    y.month = 12
-    y.day = 8
-    y.hour = 17
-    y.minute = 25
-    y.second = 59
+        ok($y == answer)
+        ok($(y.to_number().to_date()) == answer)
 
-    check $y == answer
-    check $(y.to_number().to_date()) == answer
+    echo "# december niggles"
+    block:
+        const
+            answer = "2017-12-08T17:25:59Z"
+        var y: DateTime
+        y.year = 2017
+        y.month = 12
+        y.day = 8
+        y.hour = 17
+        y.minute = 25
+        y.second = 59
+
+        ok($y == answer)
+        ok($(y.to_number().to_date()) == answer)
+
+    echo "1..",tests-1
