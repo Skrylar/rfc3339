@@ -31,6 +31,8 @@
 
 import parseutils
 
+from times import Time, fromUnix, toUnix, toTime, DateTime, inZone, utc
+
 const
     YearZeroSeconds = 31622400
     EpochSeconds = 62167219200 - YearZeroSeconds
@@ -542,6 +544,28 @@ proc to_date*(self: string): DateTime =
         return work
 
     return
+
+converter to_stdtime*(self: DateTime): times.Time =
+    ## Converts the RFC3339 date object to a standard library Time
+    ## object. Note that we always convert whatever timezone was specified
+    ## in the date back to UTC before creating the time object.
+    return from_unix(self.to_epoch)
+
+converter to_stddatetime*(self: DateTime): times.DateTime =
+    ## Converts the RFC3339 date object to a standard library DateTime
+    ## object. Note that we always convert whatever timezone was specified
+    ## in the date back to UTC before creating the time object.
+    return in_zone(times.Time(self), utc())
+
+converter to_rfc3339*(self: times.Time): DateTime =
+    ## Converts a standard library Time object to an RFC3339 date/time object.
+    ## We assume the timezone to be UTC.
+    return to_epoch_date(to_unix(self))
+
+converter to_rfc3339*(self: times.DateTime): DateTime =
+    ## Converts a standard library Time object to an RFC3339 date/time object.
+    ## We assume the timezone to be UTC.
+    return to_epoch_date(to_unix(to_time(self)))
 
 when isMainModule:
     echo "TAP version 13"
